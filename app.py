@@ -1,19 +1,25 @@
+#Merged app.py
+
+
 # gpt-4.1 version
 
+
 import streamlit as st
-import openai
 import pandas as pd
 import numpy as np
 import re
+import openai
 from analysis_utils import *
 from utils_text import *
 from analysis_utils import t_test_analysis
 
-# Başlık
-st.title("🧠 Data Analysis Tool")
+# ✅ Application configration
+st.set_page_config(page_title="📊 Smart Data Analyzer", layout="wide")
+st.title("📊 Smart Data Analyzer")
 
 # OpenAI API Key
 client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
 
 # AI yorum fonksiyonu (tam cümle ve token sınırıyla)
 def ai_interpretation(prompt):
@@ -24,7 +30,7 @@ def ai_interpretation(prompt):
                 {"role": "system", "content": "You are a helpful AI assistant that analyzes data and provides insights. You can highlight anomalies, interpret correlations between attributes, find and tell similarities or impact from other attributes."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=700,
+            max_tokens=500,
             temperature=0.7
         )
         raw_message = response.choices[0].message.content.strip()
@@ -38,15 +44,38 @@ def ai_interpretation(prompt):
     except Exception as e:
         return f"**Error during AI interpretation:** {e}"
 
-# Veri yükleme
-uploaded_file = st.file_uploader("Upload your dataset", type=["csv", "xlsx"])
+# ✅ Uploading File
+uploaded_file = st.file_uploader(
+    "Upload your dataset (CSV, Excel, JSON, XML, Feather)",
+    type=["csv", "xlsx", "xls", "json", "xml", "feather"]
+)
 
 if uploaded_file:
     try:
-        df = load_data(uploaded_file)
+        # File Typles
+        if uploaded_file.name.endswith('.csv'):
+            df = pd.read_csv(uploaded_file)
+        elif uploaded_file.name.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(uploaded_file)
+        elif uploaded_file.name.endswith('.json'):
+            df = pd.read_json(uploaded_file)
+        elif uploaded_file.name.endswith('.xml'):
+            df = pd.read_xml(uploaded_file)
+        elif uploaded_file.name.endswith('.feather'):
+            df = pd.read_feather(uploaded_file)
+        else:
+            st.error("Unsupported file format.")
+            st.stop()
     except Exception as e:
-        st.error(f"Error loading file: {e}")
+        st.error(f"Failed to read file: {e}")
         st.stop()
+
+
+  # ✅ Data Priview
+    st.subheader("🔍 Data Preview")
+    st.dataframe(df.head())
+
+
 
     option = st.selectbox("Select Analysis Type", [
         "Numeric Summary",
@@ -65,14 +94,24 @@ if uploaded_file:
         st.markdown("### AI Insights")
         st.write(ai_result)
 
-    elif option == "Correlation Matrix":
-        fig, corr_df = correlation_plot(df)
-        st.plotly_chart(fig)
+ elif option == "Correlation Matrix":
+    fig, corr_df = correlation_plot(df)
+    
+    # Grafiği genişlet
+    fig.update_layout(
+        width=1000,
+        height=700,
+        margin=dict(l=50, r=50, t=50, b=50),
+    )
+    
+    st.plotly_chart(fig)
+
 
         prompt = f"Explain the key points and findings from this correlation matrix:\n{corr_df.to_string()}"
         ai_result = ai_interpretation(prompt)
         st.markdown("### AI Insights")
         st.write(ai_result)
+
 
     elif option == "Chi-Square Test":
         categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
